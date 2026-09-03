@@ -1,0 +1,210 @@
+;==============================================================================
+; MB03+ boot - SD card initialization
+;
+; Initialization subset taken from the common EasySD SD driver dated
+; 2026-09-03 (based on mdos1sd/develop/fat32drv/fat32drv.asm).
+;
+; The per-command limits and protocol checks are kept from the current EasySD
+; routine. Its bounded WAIT, initialization and ACMD41 retry counters ensure
+; that initialization always returns without a separate interrupt watchdog.
+;==============================================================================
+
+SPI_PORT               equ #EB
+OUT_PORT               equ #E7
+
+SD_0                   equ #FE
+
+CMD_0                  equ #40
+CMD_8                  equ #40+8
+ACMD41                 equ #40+41
+CMD_55                 equ #40+55
+CMD_58                 equ #40+58
+
+WAIT_CMD_TIMEOUT       equ 2048
+
+SD_INIT
+                ld b,10
+sd_init_loop
+                push bc
+                call SD_POWER_ON
+                call SD_RESET
+                cp 1
+                jr nz,sd_init_fail
+
+                call SD_SEND_IF_COND
+                or a
+                jr nz,sd_init_fail
+
+                call SD_OCR
+                or a
+                jr nz,sd_init_fail
+
+                call SD_POWER_ON
+                pop bc
+                xor a                   ; no error
+                ret
+
+sd_init_fail
+                call SD_POWER_ON
+                pop bc
+                djnz sd_init_loop
+                ld a,#FF                ; cannot initialise
+                ret
+
+SD_POWER_ON
+                ld a,#FF                ; CS high
+                out (OUT_PORT),a
+                ld b,10                 ; at least 80 clocks
+                ld a,#FF
+sd_power_clocks
+                out (SPI_PORT),a
+                djnz sd_power_clocks
+                ret
+
+SD_RESET
+                ld a,(card_select)      ; activate selected card
+                out (OUT_PORT),a
+                ld a,#FF                ; dummy clock
+                out (SPI_PORT),a
+
+                ld a,CMD_0
+                out (SPI_PORT),a
+                xor a
+                out (SPI_PORT),a
+                out (SPI_PORT),a
+                out (SPI_PORT),a
+                out (SPI_PORT),a
+                ld a,#95
+                out (SPI_PORT),a
+
+                call SD_WAIT
+                cp 1
+                ret z
+
+SD_ERROR
+                ld e,a
+                call SD_POWER_ON
+                ld a,e
+                ret
+
+SD_SEND_IF_COND
+                ld a,#FF
+                out (SPI_PORT),a
+                ld a,CMD_8
+                out (SPI_PORT),a
+                xor a
+                out (SPI_PORT),a
+                xor a                   ; more time for DivMMC
+                out (SPI_PORT),a
+                ld a,1
+                out (SPI_PORT),a
+                ld a,#AA
+                out (SPI_PORT),a
+                ld a,#87                ; CRC for CMD8
+                out (SPI_PORT),a
+
+                call SD_WAIT
+                cp 1
+                jr nz,SD_ERROR
+
+                ; Validate R7 response: 00 00 01 AA.
+                in a,(SPI_PORT)
+                or a
+                jr nz,SD_ERROR
+                in a,(SPI_PORT)
+                or a
+                jr nz,SD_ERROR
+                in a,(SPI_PORT)
+                cp 1
+                jr nz,SD_ERROR
+                in a,(SPI_PORT)
+                cp #AA
+                jr nz,SD_ERROR
+
+                ld b,200
+sd_retry_acmd41
+                push bc
+                ld a,#FF
+                out (SPI_PORT),a
+                ld a,CMD_55
+                out (SPI_PORT),a
+                xor a
+                out (SPI_PORT),a
+                out (SPI_PORT),a
+                out (SPI_PORT),a
+                out (SPI_PORT),a
+                ld a,#FF
+                out (SPI_PORT),a
+
+                call SD_WAIT
+                cp 2
+                jr nc,sd_cmd55_error    ; anything greater than 1 is an error
+
+                ld a,#FF
+                out (SPI_PORT),a
+                ld a,ACMD41
+                out (SPI_PORT),a
+                ld a,%01000000          ; HCS / bit 30
+                out (SPI_PORT),a
+                xor a
+                out (SPI_PORT),a
+                out (SPI_PORT),a
+                out (SPI_PORT),a
+                ld a,#FF
+                out (SPI_PORT),a
+
+                call SD_WAIT
+                pop bc
+                or a
+                ret z                   ; card is ready
+                djnz sd_retry_acmd41
+
+                ld a,#FF
+                ret
+
+sd_cmd55_error
+                pop bc
+                jp SD_ERROR
+
+SD_OCR
+                ld a,CMD_58
+                ld hl,0
+                ld de,0
+                call SD_SENDCMD
+                ld e,a
+                in a,(SPI_PORT)
+                in a,(SPI_PORT)
+                in a,(SPI_PORT)
+                in a,(SPI_PORT)
+                ld a,e
+                ret
+
+SD_SENDCMD
+                ld c,SPI_PORT
+                out (c),a
+                nop                     ; DivMMC needs more time
+                out (c),h
+                nop
+                out (c),l
+                nop
+                out (c),d
+                nop
+                out (c),e
+                ld a,#FF
+                out (c),a
+
+SD_WAIT
+                ld bc,WAIT_CMD_TIMEOUT
+sd_wait_loop
+                in a,(SPI_PORT)
+                cp #FF
+                ret nz
+                dec bc
+                ld a,b
+                or c
+                jr nz,sd_wait_loop
+                ld a,#FF                ; per-command timeout
+                ret
+
+card_select
+                db SD_0

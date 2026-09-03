@@ -19,6 +19,21 @@ g_ZXi_port1	equ #7D3B
 
 u_ZXi_port0 equ #FC3B
 u_ZXi_port1 equ #FD3B
+
+default_disk		equ 1		; EasyCF/EasySD first MBD disk
+legacy_default_disk	equ 3		; original EasyHDD layout
+ula_workspace_dir	equ 2
+
+bsd_dos			equ #3C9E
+bsd_rom			equ #3C98
+bsd_getcst		equ #12
+bsd_setdrv		equ #13
+bsd_setdir		equ #14
+bsd_setlcx		equ #15
+bsd_seasx		equ #19
+bsd_loa1x		equ #22
+bsd_start		equ #30
+ula_workspace_start	equ #8000
 ;███████████████ M A I N  C O D E ███████████████████████████████████████	
 
 			org #C000//49152-gap		
@@ -42,7 +57,7 @@ boot		di
 endboot		BLOCK #38-endboot,0
 ;			DISP #38
 im1			ei
-			ret					
+			ret
 boot2
 
 endramtest	ld hl,ramcodeinrom
@@ -1198,23 +1213,53 @@ holdkey4	call iinkey.IINKEY
 			out (#17),a
 			ld a,#1E
 			rst #20		;sluzba .KILL
-			ld e,3
-			ld a,#13
+			ld e,default_disk
+			ld a,bsd_setdrv
 			rst #20
+			jr nc,autosys_legacy_disk
 			ld e,0
-			ld a,#14	;zvol disk 3, adresar 0
+			ld a,bsd_setdir
 			rst #20
-			ld a,#30
+			jr nc,autosys_legacy_disk
+			ld a,bsd_start
 			rst #20		;sluzba #30, start systemu. Pokud je autosys nalezen, dale se v kodu nepokracuje
-			/*ld a,#40	;soubor autosys nenalezen
-			out (#17),a	;tedy vykonej reset
-			jp #3906*/
-			jr 6F
+
+autosys_legacy_disk
+			ld e,legacy_default_disk
+			ld a,bsd_setdrv
+			rst #20
+			jr nc,bsdos_reset_ula
+			ld e,0
+			ld a,bsd_setdir
+			rst #20
+			jr nc,bsdos_reset_ula
+			ld a,bsd_start
+			rst #20
+			jp bsdos_reset_ula
 
 5			cp 'e'					// key e
-			jr nz, 7F				// no key
+			jp z,bsdos_reset_ula
+			cp 'f'					// key f: same reset, ULAplus off
+			jp nz,7F				// no key
+			xor a
+			jr bsdos_reset_common
 
-6
+bsdos_reset_ula
+			ld a,1
+
+bsdos_reset_common
+			ld (ula_requested),a
+
+			; Keep the proven firmware mapping used by the working SD init.
+			; The new EasySD routine has bounded retries and keeps interrupts off.
+			xor a
+			ld bc,ZXi_port0
+			out (c),a
+			ld bc,ZXi_port1
+			dec a					; HW #FF - Firmware
+			out (c),a
+			call SD_INIT				; always initialize SD for E and F
+
 			xor a
 			ld bc,ZXi_port0			//ZXi portselect
 			out (c),a
@@ -1237,7 +1282,134 @@ holdkey4	call iinkey.IINKEY
 			out (c),a			
 			ld a,64					// 128K reset in BSROM140
 			out (23),a
-			jp #3906				//jp to bsrom140
+
+			ld bc,g_ZXi_port0		; activate SAFE NMI
+			ld a,#80
+			out (c),a
+			inc b
+			ld a,1
+			out (c),a
+
+			call ula_disable
+			ld a,(ula_requested)
+			or a
+			jp z,ula_fallback
+
+			call bsd_dos
+			ld a,bsd_getcst
+			rst #20
+			jp nc,ula_fallback
+			push hl					; save current file number
+			push de					; save current directory and disk
+			xor a
+			ld (ula_workspace_ok),a
+
+			ld e,default_disk
+			call ula_try_disk
+			jr c,ula_workspace_loaded
+			ld e,legacy_default_disk
+			call ula_try_disk
+			jr nc,ula_restore_context
+
+ula_workspace_loaded
+			ld e,0
+			ld a,bsd_setdir
+			rst #20
+			jr nc,ula_restore_context
+
+			call ula_enable
+			call ula_workspace_start
+			call bsd_dos
+			ld a,1
+			ld (ula_workspace_ok),a
+
+ula_restore_context
+			pop de
+			push de
+			ld a,bsd_setdrv
+			rst #20
+			pop de
+			ld e,d
+			ld a,bsd_setdir
+			rst #20
+			pop bc
+			ld a,bsd_setlcx
+			rst #20
+
+			ld a,(ula_workspace_ok)
+			or a
+			jp z,ula_fallback
+			call bsd_rom
+			jp #3906
+
+ula_try_disk
+			ld a,bsd_setdrv
+			rst #20
+			jr nc,ula_try_failed
+			ld e,ula_workspace_dir
+			ld a,bsd_setdir
+			rst #20
+			jr nc,ula_try_failed
+			ld hl,ulaplusname
+			ld e,255
+			ld a,bsd_seasx
+			rst #20
+			jr nz,ula_try_failed
+			ld a,bsd_getcst
+			rst #20
+			jr nc,ula_try_failed
+			ld ix,ula_workspace_start
+			ld bc,0
+			ld e,1
+			ld a,bsd_loa1x
+			rst #20
+			jr nc,ula_try_failed
+			scf
+			ret
+
+ula_try_failed
+			or a					; clear carry
+			ret
+
+ula_disable
+			ld bc,#BF3B
+			ld a,#40
+			out (c),a
+			ld b,#FF
+			xor a
+			out (c),a
+			ret
+
+ula_enable
+			ld bc,#BF3B
+			ld a,#40
+			out (c),a
+			ld b,#FF
+			ld a,1
+			out (c),a
+			ret
+
+ula_fallback
+			call ula_disable
+			call #3C9C
+			ld a,#38
+			ld (#1266),a
+			ld (#128E),a
+			ld a,#20
+			ld (#22A2),a
+			ld a,#8D
+			ld (#03C8),a
+			ld (#0541),a
+			ld a,#32
+			ld (#126D),a
+			call bsd_rom
+			jp #3906
+
+ulaplusname
+			db "ula+_wksp "
+
+ula_requested		db 0
+ula_workspace_ok	db 0
 			
 7			cp 'd'
 			jp nz, 8F				
@@ -1778,7 +1950,7 @@ clock
 			ld hl, 16384+2048+32+512+27
 			ld de, 16384+2048+32+512+27+1
 			ld bc,4
-1B			ld (hl),0
+clock_clear_row	ld (hl),0
 			push bc
 			ldir
 			pop bc
@@ -1788,7 +1960,7 @@ clock
 			ld e,l
 			inc e
 			dec a
-			jr nz, 1B
+			jr nz,clock_clear_row
 
 //			ld a,2
 //			out (254),a
@@ -1826,7 +1998,7 @@ clean		ld a,7			//clear place
 			ld hl, 16384+2048+32+256+0
 			ld de, 16384+2048+32+256+0+1
 			ld bc,255-32
-1B			ld (hl),0
+clean_attr_row	ld (hl),0
 			push bc
 			ldir
 			pop bc
@@ -1836,7 +2008,7 @@ clean		ld a,7			//clear place
 			ld e,l
 			inc e
 			dec a
-			jr nz, 1B
+			jr nz,clean_attr_row
 			ld hl, 16384+2048+64+0
 			ld de, 16384+2048+64+0+1
 			ld bc,255-64
@@ -2008,6 +2180,8 @@ SLIM		db 1 // detection of Slim
 
 //test#3FFD   db 32
 
+	INCLUDE "sd_init.a80"
+
 DATE		db 16,0
 	LUA ALLPASS
 	_pc('db	"' .. os.date("%Y%m%d") .. '"') 
@@ -2015,9 +2189,10 @@ DATE		db 16,0
 	dc " " 
 		//block 8 // kompenzace delky souboru kvuli os.date
 endramcode			
+	ASSERT endramcode <= #10000
 	
 	savesna  "boot.sna",ramcode
 	EMPTYTAP "boot.tap"
 	SAVETAP  "boot.tap",CODE,"boot",maincode,endramcode-maincode,maincode
 	ENDMODULE
-		
+
