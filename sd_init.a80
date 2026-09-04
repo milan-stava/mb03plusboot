@@ -23,7 +23,7 @@ CMD_58                 equ #40+58
 WAIT_CMD_TIMEOUT       equ 2048
 
 SD_INIT
-                ld b,10
+		ld b,20                ; 10 was too low for cold start at 20 MHz
 sd_init_loop
                 push bc
                 call SD_POWER_ON
