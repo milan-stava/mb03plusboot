@@ -13,6 +13,7 @@ SPI_PORT               equ #EB
 OUT_PORT               equ #E7
 
 SD_0                   equ #FE
+SD_1			equ #FD
 
 CMD_0                  equ #40
 CMD_8                  equ #40+8
@@ -21,6 +22,22 @@ CMD_55                 equ #40+55
 CMD_58                 equ #40+58
 
 WAIT_CMD_TIMEOUT       equ 2048
+
+
+SD_INIT_BOTH
+                ; Initialize SD2 first.
+                ; SD1 -> SD2 sequence proved unreliable at >=14 and 20 MHz on MB03+.
+                ld a,SD_1
+                ld (card_select),a
+                call SD_INIT
+
+                ld a,SD_0
+                ld (card_select),a
+                call SD_INIT
+
+                ld a,SD_0
+                ld (card_select),a
+                ret
 
 SD_INIT
 		ld b,20                ; 10 was too low for cold start at 20 MHz

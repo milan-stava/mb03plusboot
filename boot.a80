@@ -1258,7 +1258,7 @@ bsdos_reset_common
 			ld bc,ZXi_port1
 			dec a					; HW #FF - Firmware
 			out (c),a
-			call SD_INIT				; always initialize SD for E and F
+			call SD_INIT_BOTH                       ; initialize SD1 and SD2 for E and F
 
 			xor a
 			ld bc,ZXi_port0			//ZXi portselect
