@@ -1136,11 +1136,14 @@ holdkey3	call iinkey.IINKEY
 			ld a,96						;first MB02+ RAM
 			dec b
 			add a,b
+			cp 98						; EasyCF page 98: keep existing driver/VDT for reinstall
+			jr z,skip_page98_copy
 			out (23), a
 			ld hl,32768
 			ld de,0
 			ld bc,16384
 			ldir
+skip_page98_copy
 			pop bc
 			djnz 22B
 

@@ -1,6 +1,29 @@
-# MB03+ BOOT – dual SD initialization
+# MB03+ BOOT
 
 This repository is a fork of the original MB03+ BOOT project.
+
+
+
+# DIFFERENCIES IN THIS FORK AS OPPOSED TO OFFICIAL BRANCH
+
+* dual SD initialization
+
+* page 98 is not erased upon press of key "1"- this enables partition info in VDT table to be preserved for Easy CF 1.1
+
+
+
+
+
+## Why page 98 is preserved on key `1`
+
+When BOOT is started with key `1`, SRAM pages are reloaded from FLASH before EasyCF is launched.  
+Page 98 contains the installed EasyCF driver and its VDT table. Rewriting this page would destroy the existing VDT contents before EasyCF 1.1 can preserve the user-defined partition names.
+
+For this reason, the copy to SRAM page 98 is skipped. EasyCF 1.1 reads the existing VDT first and then installs the new driver into page 98 normally.
+
+
+
+
 
 The `sd2-init` branch contains an **unofficial modification** which extends the BOOT **E** and **F** functions to initialize both SD card slots.
 
@@ -9,7 +32,6 @@ The `sd2-init` branch contains an **unofficial modification** which extends the 
 When BOOT function **E** or **F** is used, the BOOT now attempts to initialize:
 
 1. SD2
-
 2. SD1
 
 If a card is not present in a slot, initialization times out and BOOT continues normally.
@@ -97,15 +119,15 @@ boot.tap
 Tested on real MB03+ hardware with:
 
 * SD1 only
-
 * SD2 only
-
 * both SD cards inserted
-
 * both SD slots empty
-
 * physical SD cards swapped between slots
-
 * CPU speeds up to 20 MHz
 
 This is an unofficial modification of the original MB03+ BOOT.
+
+
+
+Use "\_run-boot.bat" to compile the project. You receive "boot.tap", where You find the "boot.bin" which You then place and use in Reflasher.
+
