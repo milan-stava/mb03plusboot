@@ -129,5 +129,5 @@ This is an unofficial modification of the original MB03+ BOOT.
 
 
 
-Use "\_run-boot.bat" to compile the project. You receive "boot.tap", where You find the "boot.bin" which You then place and use in Reflasher.
+Use "_run-boot.bat" to compile the project. You receive "boot.tap", where You find the "boot.bin" which You then place and use in Reflasher.
 
