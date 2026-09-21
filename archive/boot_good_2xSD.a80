@@ -1,0 +1,2198 @@
+	MODULE 	boot
+	DEVICE 	ZXSPECTRUM48
+//	OUTPUT	boot.cde
+	
+;███████████████ V A R I A B L E S ██████████████████████████████████████		
+DMA 		equ #0B
+ULA			equ #FE
+ZXi_port0	equ #703B
+ZXi_port1	equ #713B
+ZXi_port2	equ #723B
+ZXi_port3	equ #733B
+ZXi_port4	equ #743B
+ZXi_port5	equ #753B
+ZXi_port6	equ #763B
+ZXi_port7	equ #773B
+
+g_ZXi_port0	equ #7C3B
+g_ZXi_port1	equ #7D3B
+
+u_ZXi_port0 equ #FC3B
+u_ZXi_port1 equ #FD3B
+
+default_disk		equ 1		; EasyCF/EasySD first MBD disk
+legacy_default_disk	equ 3		; original EasyHDD layout
+ula_workspace_dir	equ 2
+
+bsd_dos			equ #3C9E
+bsd_rom			equ #3C98
+bsd_getcst		equ #12
+bsd_setdrv		equ #13
+bsd_setdir		equ #14
+bsd_setlcx		equ #15
+bsd_seasx		equ #19
+bsd_loa1x		equ #22
+bsd_start		equ #30
+ula_workspace_start	equ #8000
+;███████████████ M A I N  C O D E ███████████████████████████████████████	
+
+			org #C000//49152-gap		
+maincode
+			DISP 0
+boot		di
+			ld sp,0
+			im 1
+;			ld	a, #C3				; Z80DMA command: WR6: Reset
+;			out	(DMA), a
+			xor	a
+			ld	i, a
+			out (ULA),a
+			ld bc,g_ZXi_port0
+			out (c),a
+			inc b
+			out (c),a  //select 0 - external device - MB03+
+			jr boot2
+			db "LMN128"
+//WARNING max #38 bytes!!!!			
+endboot		BLOCK #38-endboot,0
+;			DISP #38
+im1			ei
+			ret
+boot2
+
+endramtest	ld hl,ramcodeinrom
+			ld de,ramcode
+			ld bc,endramcode-ramcode
+			ldir
+			jp ramcode
+ramcodeinrom 	
+
+gap			equ ramcodeinrom-boot
+			ent						; restore address to compile to right place
+ramcode		
+			di						; for sna test
+			ld sp,0					; for sna test
+			im 1
+
+			ld bc,ZXi_port0
+			ld a,#FF			//Board version
+			out (c),a
+			ld bc,ZXi_port7	
+			in a,(c)
+			cp #35				//is Slim board?
+			ld a,1
+			jr z,1F
+			dec a				//not Slim
+1			ld (SLIM),a			//save board version	
+
+			
+//test Enter key to start full firmware
+			ld a,%10111111			//A14 - row with enter key 
+			in a,(#FE)
+			and 1
+			jr z,enterpress
+
+			ld bc,ZXi_port0
+			ld a,#22				//StartUp order
+			out (c),a
+			inc b	
+			in a,(c)	
+enterpress	ld (suorder+1),a		//save startup order
+			
+suorder		ld a,0
+			or a
+			call z,effect.begin
+
+			call cls.CLS
+			ld   a,7
+			ld   HL,22528
+			ld   DE,22529
+			ld   BC,767
+			ld   (HL),a
+			ldir
+
+			ld a,(suorder+1)
+			or a
+			jp nz,skipanim
+
+//Start animation sequence
+
+				call iinkey.IINKEY		; waiting for key
+				jp nz,skipanim
+			ld a,0
+			ld (txy32.orflag),a
+			ld a,66
+			ld (txy32.T32_ATT),a
+			ld	bc,#0000
+			call fall1
+				call iinkey.IINKEY		; waiting for key
+				jp nz,skipanim
+			ld a,70
+			ld (txy32.T32_ATT),a
+			ld	bc,#0010
+			call fall1
+				call iinkey.IINKEY		; waiting for key
+				jp nz,skipanim			
+			ld a,68
+			ld (txy32.T32_ATT),a
+			ld	bc,#002E
+			call fall1
+				call iinkey.IINKEY		; waiting for key
+				jp nz,skipanim			
+			ld a,69
+			ld (txy32.T32_ATT),a
+			ld	bc,#0059
+			call fall1
+				call iinkey.IINKEY		; waiting for key
+				jp nz,skipanim
+				
+			ld a,1
+			ld (txy32.orflag),a
+			ld a,66
+			ld (txy32.T32_ATT),a
+			ld	bc,#0000
+			call fall2
+				call iinkey.IINKEY		; waiting for key
+				jp nz,skipanim			
+			ld a,70
+			ld (txy32.T32_ATT),a
+			ld	bc,#0010
+			call fall2			
+				call iinkey.IINKEY		; waiting for key
+				jp nz,skipanim			
+			ld a,68
+			ld (txy32.T32_ATT),a
+			ld	bc,#0028
+			call fall3
+				call iinkey.IINKEY		; waiting for key
+				jp nz,skipanim			
+			ld a,69
+			ld (txy32.T32_ATT),a
+			ld	bc,#0058
+			call fall4
+				call iinkey.IINKEY		; waiting for key
+				jp nz,skipanim			
+			
+			ld a,0
+			ld (txy32.orflag),a
+			ld a,69
+			ld (txy32.T32_ATT),a
+			ld	bc,#2A57
+			ld  de,#2A60
+			ld a,#4B
+			call wide1
+				call iinkey.IINKEY		; waiting for key
+				jp nz,skipanim			
+//			ld b,1
+//			call wait.wait
+			ld a,68
+			ld (txy32.T32_ATT),a
+			ld	bc,#2A2A
+			ld  de,#2A35
+			ld a,#1F
+			call wide1
+				call iinkey.IINKEY		; waiting for key
+				jp nz,skipanim			
+
+;			call iinkey.ANYKEY	
+			jp follow1
+			
+wide1		push af
+			push de
+			push bc
+			ld	(txy32.cursor),bc
+			ld a,132
+			call txy32.xy
+			pop bc
+			push bc
+			ld a,8
+			add a,b
+			ld b,a
+			ld a,134
+			ld	(txy32.cursor),bc
+			call txy32.xy
+			pop bc
+			pop de
+			push bc
+			push de
+			ld	(txy32.cursor),de
+			ld a,129
+			call txy32.xy
+			pop de
+			push de
+			ld a,8
+			add a,d
+			ld d,a
+			ld	(txy32.cursor),de
+			ld a,131
+			call txy32.xy
+//			ld b,4
+//			call wait.wait
+			pop de
+			pop bc
+			pop af
+			inc e
+			dec c
+			cp c
+			jr nz,wide1
+			ret
+			
+fall1		push bc
+			call singledot
+//			ld b,1
+//
+//			call wait.wait
+			pop bc
+			inc b
+			ld a,#2B
+			cp b
+			jr nz,fall1
+			ret
+fall2		push bc
+			call halfdot
+//			ld b,1
+//			ld hl,1
+//			call wait.wait
+			pop bc
+			inc b
+			ld a,#2B
+			cp b
+			jr nz,fall2
+			ret			
+	
+fall3		push bc
+			call halfdot3
+//			ld b,1
+//			ld hl,1
+//			call wait.wait
+			pop bc
+			inc b
+			ld a,#2B
+			cp b
+			jr nz,fall3
+			ret	
+
+fall4		push bc
+			call halfdot4
+//			ld b,1
+//			ld hl,1
+//			call wait.wait
+			pop bc
+			inc b
+			ld a,#2B
+			cp b
+			jr nz,fall4
+			ret				
+	
+halfdot     ld	(txy32.cursor),bc
+			ld a,132
+			call txy32.xy
+			ld a,133
+			jp txy32.xy
+
+halfdot3    ld	(txy32.cursor),bc
+			ld a,136
+			call txy32.xy
+			ld a,137
+			jp txy32.xy	
+
+halfdot4    ld	(txy32.cursor),bc
+			ld a,138
+			call txy32.xy
+			ld a,139
+			jp txy32.xy	
+			
+singledot	ld	(txy32.cursor),bc
+			ld a,132
+			push bc
+			call txy32.xy
+			ld a,133
+			call txy32.xy
+			pop	bc
+			ld a,8
+			add a,b
+			ld b,a
+			ld	(txy32.cursor),bc	
+			ld a,134
+			call txy32.xy
+			ld a,135
+			call txy32.xy
+			ret
+
+
+follow1		
+			ld a,(SLIM)
+			and a 
+			jr nz,skipanim
+			ld de,#050F
+	        ld hl,ultimatelogo
+			ld a,13				// number of sprites in animations
+1			push af
+			push de
+			push hl
+			call sprite2.OK
+			ld b,1
+			ld hl,#0E00
+			call wait.wait
+			pop hl
+			ld de,20			// lenght of sprite2
+			add hl,de
+			pop de
+			inc e
+			pop af
+			dec a
+			jr nz,1B
+
+skipanim	
+
+//SetUp section
+			di
+			
+			xor a
+			ld bc,g_ZXi_port0
+			out (c),a
+			inc b
+			out (c),a  //select 0 - external device - MB03+
+			
+			in a, (#53)
+			ex af,af'
+			ld a, #E0
+			out (#53),a
+/*			ld b,16
+			ld hl,#2000
+			xor a
+2			or (hl)
+			jr nz,3F
+			inc hl
+			djnz 2B
+			jr 8F   			//setup is empty use FPGA default*/
+3			ld b,1				// number of register to set
+			ld hl, setup_tab	
+4			ld a,(hl)
+			push bc
+			ld bc,ZXi_port0
+			out (c),a
+			inc b
+			inc hl
+			ld e, (hl)
+			inc hl
+			ld d, (hl)
+			inc hl
+			ld a,(de)
+			out (c),a
+			pop bc
+			djnz 4B
+			jr 8F
+setup_tab   db 4				//set LED matrix
+			dw #2004			
+/*setup_tab   db 1
+			dw #2001
+			db 4
+			dw #2004
+			db 5
+			dw #2005
+			db 6
+			dw #2006
+			db 7
+			dw #2007
+			db 9
+			dw #2009
+			db #A
+			dw #200A
+			db #B
+			dw #200B
+			db #C
+			dw #200C
+			db #D
+			dw #200D
+			db #F
+			dw #200F
+			db #10
+			dw #2010
+			db #11
+			dw #2011
+			db #12
+			dw #2012
+			db #18
+			dw #2018
+			db #19
+			dw #2019
+			db #20
+			dw #2020
+			db #2C
+			dw #202C
+			db #2D
+			dw #202D
+			db #3F
+			dw #203F
+			db #40
+			dw #2040*/
+
+8			ex af,af'
+			out (#53),a
+//End Setup section
+
+//test if DMA on the ZXS is available (eLeMeNt ZX)
+			ld a,#12
+			ld bc,ZXi_port0
+			out (c),a
+			inc b
+			in a,(c)
+			bit 1,a
+			jr z,1F 	// bit 1=0 skip test if DMA in available in the zx spectrum
+			bit 0,a
+			jr z,1F		// bit 0=0 DMA is not enable; skip test
+			and #FE		//zachovej si bity 7-1
+			out (c),a 	//DMA temporary disable
+			ld a,#C3	//reset DMA
+			out (DMA),a
+			in a, (DMA) //read from DMA
+			and #FE		//zajimaji mne jen bity 7-1
+			cp #FC		//DMA is available?
+			jr z,2F		//DMA is available in ZX Spectrum, keep MB03+ DMA dissabled
+			in a,(c)
+			set 0,a
+			out (c),a
+			jr 1F
+//vypis ze je DMAcko v MB03+ dissablovane, protoze se naslo druhe v ZX Spectrum
+2
+			ld a,#C3			//reset DMA
+			out (DMA),a
+			ld	bc,#3FFB
+			ld	(txy51.cursor),bc
+			ld	hl,TX1
+			call txy51.txy	
+
+1			//jeste jeden test DMA
+			ld a,#C3	//reset DMA
+			out (DMA),a
+			in a, (DMA) //read from DMA
+			and #FE		//zajimaji mne jen bity 7-1
+			cp #FC		//DMA is available?
+			jr z,2F		//DMA is available
+			ld	bc,#3FF6 //no DMA active !
+			ld	(txy51.cursor),bc
+			ld	hl,TX2
+			call txy51.txy
+2			 
+// set wifi module to gently power consumption
+wfon		
+			ld bc,ZXi_port0
+			ld a,5
+			out (c),a
+			inc b
+			in a,(c)			
+			rrca
+			jr nc,2F	//not enable
+			rrca
+			jr nc,2F	//not low rfpower
+			ld b,1					; wftimeout	
+wfloop1		ld de,0							
+wftimeout	dec de
+			ld a,d
+			or e
+			jr nz, wftimeout
+			djnz wfloop1
+			ld b,#13				; wifi ZXi TX port
+			ld hl,wifistring
+
+1			ld a,(hl)
+			out (c),a
+			ex af,af'
+wfbusy		
+			in a,(c)
+			bit 1,a					
+			jr nz,wfbusy
+			ex af,af'						
+			inc hl
+			cp 10			//test end of string
+			jr nz,1B	
+			jr 2F
+wifistring  db "AT+RFPOWER=0",13,10
+
+2	
+//AY test - is available internal AY?
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			inc b
+			dec a					//HW - FF firmware
+			out (c),a
+			ei	
+			halt				//waiting for border to get relevant data
+			di
+			ld bc,65533			//real AY active?
+			ld a,2
+			out (c),a
+			ld b,#BF
+			out (c),a
+			ld b,#FF			
+			in a, (c)
+			cp 2
+			jr z,realayinstalled //if real ay present skip it
+			ld bc,ZXi_port0
+			ld a,#01
+			out (c),a
+			inc b
+			in a,(c)
+			bit 1,a
+			jr z,realayinstalled //if 3xAY disabled skip it
+			inc b
+			in a,(c)
+			set 1,a				//enable reading of MB03+ AYs
+			out (c),a
+realayinstalled
+// profi interface setup - dedicated to Hood
+			xor a
+			ld bc,#01EF
+			out (c),a
+			inc a
+			inc b
+			out (c),a
+//show fw main screen
+			ld de,#0000
+			ld a,(SLIM)
+			and a
+			jr nz,1F
+	    	ld hl,MB03pluslogo
+			call sprite2.OK
+			jp 2F
+1			ld hl,MB03pluslogo+2
+			ld bc,#0520
+			call sprite2.OKBC		//jen par radku loga
+			//red dot
+			ld a,0
+			ld (txy32.orflag),a
+			ld a,66
+			ld (txy32.T32_ATT),a
+			ld	bc,#2A00
+			call singledot
+			//yellow dot
+			ld a,70
+			ld (txy32.T32_ATT),a
+			ld	bc,#2A10
+			call singledot
+			//green dot
+			ld a,68
+			ld (txy32.T32_ATT),a
+			ld	bc,#2A2E
+			call singledot
+			//blue dot
+			ld a,69
+			ld (txy32.T32_ATT),a
+			ld	bc,#2A59
+			call singledot
+			//wider
+			ld a,0
+			ld (txy32.orflag),a
+			ld a,69
+			ld (txy32.T32_ATT),a
+			ld	bc,#2A57
+			ld  de,#2A60
+			ld a,#4B
+			call wide1
+			ld a,68
+			ld (txy32.T32_ATT),a
+			ld	bc,#2A2A
+			ld  de,#2A35
+			ld a,#1F
+			call wide1
+			//text Slim
+			ld	bc,#30E9
+			ld	(txy51.cursor),bc
+			ld	hl,SLIMTXT
+//			call txy51.txy
+
+2
+
+			ld hl, STRIPS
+			ld bc,#4800
+			ld	(txy32.cursor),bc
+			push hl
+			call txy32.txy
+			pop hl
+			ld bc,#A000
+			ld	(txy32.cursor),bc
+			call txy32.txy
+;carymary         
+			ld bc,#4800
+			ld de,#48ff
+			call draw_jugo.DRAW
+
+//StartUp order #2
+			ld a,(suorder+1)
+			cp 2
+			jp z,fastbs
+			cp 3
+			jp z,fastsd
+
+			ld	bc,#3F00
+			ld	(txy51.cursor),bc
+			ld	hl,TEXT0
+			call txy51.txy
+			ld	a,(SLIM)
+			and a	
+			jr nz,1F
+			ld	bc,#A800
+			ld	(txy51.cursor),bc
+			ld	hl,TEXT4
+			call txy51.txy			
+			ld	bc,#B000
+			ld	(txy51.cursor),bc
+			ld	hl,TEXT2
+			call txy51.txy
+			jr 2F
+1			ld	bc,#A800
+			ld	(txy51.cursor),bc
+			ld	hl,TEXT4S
+			call txy51.txy	
+
+2			ld	bc,#B800
+			ld	(txy51.cursor),bc
+			ld	hl,TEXT3
+			call txy51.txy	
+			ld	bc,#B087
+			ld	(txy51.cursor),bc
+			ld	hl,TEXT5
+			call txy51.txy
+			ld	bc,#9EBE
+			ld	(txy51.cursor),bc
+			ld	hl,FW1
+			call txy51.txy
+			/*ld	bc,#9EBF
+			ld	(txy51.cursor),bc
+			ld	hl,FW2
+			call txy51.txy*/
+			ld	bc,#9ED7
+			ld	(txy51.cursor),bc
+			ld	hl,DATE
+			call txy51.txy
+//Core Time Stamp
+			ld	bc,#9E70
+			ld	(txy51.cursor),bc
+			ld	hl,COREFW1
+			call txy51.txy
+			ld	bc,#9E89
+			ld	(txy51.cursor),bc
+			ld	hl,COREFW2
+			call txy51.txy
+			ld	bc,#9E93
+			ld	(txy51.cursor),bc
+			ld bc,ZXi_port0
+			ld a,#FF
+			out (c),a
+			ld b,high ZXi_port7
+1			dec b
+			ld h,0
+			in l,(c)
+			push bc
+			call NUMBER1
+			pop bc
+			ld a,b
+			cp high ZXi_port4
+			jr nz, 1B
+//Hardware
+			ld	bc,#5000
+			ld	(txy51.cursor),bc
+			ld	hl,HW1
+			call txy51.txy
+			ld	a,(SLIM)
+			and a	
+			jr nz,1F
+			ld	bc,#5803
+			ld	(txy51.cursor),bc
+			ld	hl,HW2
+			call txy51.txy
+			ld	bc,#6003
+			ld	(txy51.cursor),bc
+			ld	hl,HW3
+			call txy51.txy
+			ld	bc,#6803
+			ld	(txy51.cursor),bc
+			ld	hl,HW4
+			call txy51.txy
+			ld	bc,#7003
+			ld	(txy51.cursor),bc
+			ld	hl,HW5
+			call txy51.txy
+			jr 2F
+1
+			ld	bc,#5803
+			ld	(txy51.cursor),bc
+			ld	hl,HW2S
+			call txy51.txy
+			ld	bc,#6003
+			ld	(txy51.cursor),bc
+			ld	hl,HW3S
+			call txy51.txy
+			ld	bc,#6803
+			ld	(txy51.cursor),bc
+			ld	hl,HW4S
+			call txy51.txy
+			ld	bc,#7003
+			ld	(txy51.cursor),bc
+			ld	hl,HW5S
+			call txy51.txy
+//Configuration display part			
+2			ld	bc,#7800
+			ld	(txy51.cursor),bc
+			ld	hl,CONF1
+			call txy51.txy
+			ld	bc,#8003
+			ld	(txy51.cursor),bc
+			ld	hl,CONF2
+			call txy51.txy
+			ld	bc,#8803
+			ld	(txy51.cursor),bc
+			ld	hl,CONF3
+			call txy51.txy
+			ld	bc,#9003
+			ld	(txy51.cursor),bc
+			ld	hl,CONF4
+			call txy51.txy
+	
+//carymary2				
+			ld bc,#A600
+			ld de,#A6ff
+			call draw_jugo.DRAW
+
+//reading CF info			
+/*			call cf.IDENT
+			ld	bc,#707B
+			ld	(txy51.cursor),bc
+			jr nz,cferr
+;model
+			ld   hl,cf.BUFFER+54
+			ld   b,40
+			call cf.PROHOD
+			set  7,(ix+79)			
+cferr		call txy51.txy*/
+; configuration tests
+
+
+// Setup keyboard second part
+/*			xor a
+			ld bc,ZXi_port0			//ZXi portselect
+			out (c),a
+			inc b
+			dec a					//HW - FF firmware
+			out (c),a
+			ei
+
+			ld bc,u_ZXi_port0		;Uno
+			ld a,#4					;SCANCODE reg_number
+			out (c),a
+			inc b
+			ld e,2					;wait time - sum with statup max 1s
+1			in a,(c)
+			cp #AA					
+			jr z,2F					;BAT keyboard initial test OK
+			halt
+			in	a, (254)
+			cpl
+			and	1Fh
+			jr  nz,3F				;if press any key skip
+			dec e
+			jr nz,1B
+//			jr 3F					; send it always to set in case keyboard is connected to eLeMeNt ZX
+2			ld a,#F6				;Keyboard - set default parameters
+			out (c),a
+			halt
+			halt
+			ld a,#ED 				;Keyboard - set LED
+			out (c),a
+			halt
+			ld a,#02 				;Keyboard - set LED - Num lock on
+			out (c),a			
+3*/				
+			ld a,(SLIM)
+			and a
+			jp z,1F
+			call i_time
+1			
+/*			ld	bc,#49D8
+			ld	(txy51.cursor),bc	
+			ld	hl,white			
+			ld a,(syn_OK)
+			or a
+			jr nz,1F
+			ld	hl,blue
+1			call txy51.txy*/
+loopkey		
+1			
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			inc b
+			dec a						//HW - FF firmware
+			out (c),a
+
+			ei
+			halt
+			di
+
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,1						//HW - 1 MB02+
+			out (c),a	
+			call clock		
+			call iinkey.IINKEY			//waiting for key
+			jr z,1B
+
+1			cp "L"
+			jr nz,1F
+			ld a,#A
+			ld bc,ZXi_port0				//DVI on
+			out (c),a
+			ld bc,ZXi_port1
+			in a,(c)
+			or 1
+			out (c),a
+			jr loopkey
+
+1			cp "S"						//SetUp
+			jr nz,1F
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			dec a						//HW - FF - Firmware
+			out (c),a
+
+			xor a
+			ld bc,g_ZXi_port0
+			out (c),a
+			inc b
+			out (c),a  //select 0 - external device - MB03+
+			
+			out (#27),a
+			out (#67),a
+			ld a,22														
+			out (#07),a
+			inc a
+			out (#47),a
+			ld a,#60					//flash enable, read only
+			out (#53),a
+			rst 0
+
+1			cp "A"						//UserApps-0
+			jr nz,1F
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			dec a						//HW - FF - Firmware
+			out (c),a
+			
+			xor a
+			ld bc,g_ZXi_port0
+			out (c),a
+			inc b
+			out (c),a  //select 0 - external device - MB03+
+
+			out (#27),a
+			out (#67),a
+			ld a,64														
+			out (#07),a
+			inc a
+			out (#47),a
+			ld a,#60					//flash enable, read only
+			out (#53),a
+			di
+			ld sp,0
+			rst 0
+1			cp "B"						//UserApps-1
+			jr nz,1F
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			dec a						//HW - FF - Firmware
+			out (c),a
+			
+			xor a
+			ld bc,g_ZXi_port0
+			out (c),a
+			inc b
+			out (c),a  //select 0 - external device - MB03+
+
+			out (#27),a
+			out (#67),a
+			ld a,66														
+			out (#07),a
+			inc a
+			out (#47),a
+			ld a,#60					//flash enable, read only
+			out (#53),a
+			di
+			ld sp,0
+			rst 0
+1			cp "C"						//UserApps-2
+			jr nz,1F
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			dec a						//HW - FF - Firmware
+			out (c),a
+
+			xor a
+			ld bc,g_ZXi_port0
+			out (c),a
+			inc b
+			out (c),a  //select 0 - external device - MB03+
+
+			out (#27),a
+			out (#67),a
+			ld a,68														
+			out (#07),a
+			inc a
+			out (#47),a
+			ld a,#60					//flash enable, read only
+			out (#53),a
+			di
+			ld sp,0
+			rst 0
+1			cp "D"						//UserApps-3
+			jr nz,1F
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			dec a						//HW - FF - Firmware
+			out (c),a
+
+			xor a
+			ld bc,g_ZXi_port0
+			out (c),a
+			inc b
+			out (c),a  //select 0 - external device - MB03+
+			
+			out (#27),a
+			out (#67),a
+			ld a,70														
+			out (#07),a
+			inc a
+			out (#47),a
+			ld a,#60					//flash enable, read only
+			out (#53),a
+			di
+			ld sp,0
+			rst 0						
+1			cp "W"						//Wifi
+			jr nz,1F
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			dec a						//HW - FF - Firmware
+			out (c),a
+
+			xor a
+			ld bc,g_ZXi_port0
+			out (c),a
+			inc b
+			out (c),a  //select 0 - external device - MB03+
+			
+			out (#27),a
+			out (#67),a
+			ld a,30														
+			out (#07),a
+			inc a
+			out (#47),a
+			ld a,#60					//flash enable, read only
+			out (#53),a
+			ld sp,0
+			rst 0
+1			jr next1												
+1			/*cp "3"
+			jp nz,next1
+			call clean
+			ld bc,#B800
+			ld	(txy32.cursor),bc
+			LD HL, STRIPS
+			call txy32.txy
+			ld bc,#BF00
+			ld de,#BFFF
+			call draw_jugo.DRAW				
+
+			ld	bc,#5808
+			ld	(txy51.cursor),bc
+			ld	hl,ULT1
+			call txy51.txy
+			ld	bc,#6008
+			ld	(txy51.cursor),bc
+			ld	hl,ULT2
+			call txy51.txy
+			ld	bc,#6808
+			ld	(txy51.cursor),bc
+			ld	hl,ULT3
+			call txy51.txy
+			ld	bc,#7808
+			ld	(txy51.cursor),bc
+			ld	hl,ULT4
+			call txy51.txy
+			ld	bc,#8008
+			ld	(txy51.cursor),bc
+			ld	hl,ULT5
+			call txy51.txy
+			ld	bc,#8808
+			ld	(txy51.cursor),bc
+			ld	hl,ULT6
+			call txy51.txy
+			ld	bc,#A008
+			ld	(txy51.cursor),bc
+			ld	hl,ULT7
+			call txy51.txy
+			ld	bc,#A808
+			ld	(txy51.cursor),bc
+			ld	hl,ULT8
+			call txy51.txy											
+holdkey5	call iinkey.IINKEY
+			jr z,holdkey5			
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			inc b
+			dec a				//HW - FF - Firmware
+			out (c),a
+			jp ramcode*/
+
+next1		cp 11h					; break
+			jr nz,2F				; no break	
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+									//HW - 0
+			out (c),a									
+			ld bc,8189				;ZX128+2A rom
+			out (c),a			
+			ld bc,32765				;ZX128 rom0 
+			out (c),a
+			ld i,a
+			im 0
+			dec a					// A should have #FF	
+			ld sp,#ffff				//Real reset simulation. Sp is set to #ffff,
+			jp 0					; jp to 0, rst 0 is not good becaus it is call
+2			
+			cp '1'					//key 1
+			jp nz,3F
+			ld	a,(SLIM)
+			and a	
+			jp nz,esxboot
+			call clean
+fastbs			ld bc,#B800
+			ld	(txy32.cursor),bc
+			LD HL, STRIPS
+			call txy32.txy
+			ld bc,#BF00
+			ld de,#BFFF
+			call draw_jugo.DRAW				
+			ld de,#0D03
+	        ld hl,BSDOSLogo
+			call sprite2.OK
+			ld	bc,#9856
+			ld	(txy51.cursor),bc
+			ld	hl,BSD1
+			call txy51.txy					
+
+holdkey3	call iinkey.IINKEY
+			jr nz,holdkey3	
+
+			ld b,6					//number of pages to transfer					
+22			push bc
+			xor a
+			ld bc,ZXi_port0					//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,255					//HW - FF - Firmware
+			out (c),a
+			xor a
+			out (#27),a
+			out (#67),a
+			pop bc
+			push bc
+			ld a,8						;first Flash block
+			dec b
+			add a,b	
+			add a,b						;multiplication by 2									
+			out (#07),a
+			inc a
+			out (#47),a
+
+			ld hl,0
+			ld de,32768
+			ld bc,16384
+			ldir
+
+			ld bc,ZXi_port1
+			ld a,1						//HW - 1 - MB02+
+			out (c),a
+			pop bc
+			push bc
+			ld a,96						;first MB02+ RAM
+			dec b
+			add a,b
+			out (23), a
+			ld hl,32768
+			ld de,0
+			ld bc,16384
+			ldir
+			pop bc
+			djnz 22B
+
+			ld a,64
+			out (23),a
+			jr 4F
+3			
+			cp '!'					; key !
+			jp nz,5F
+			
+			call clean
+			ld bc,#B800
+			ld	(txy32.cursor),bc
+			LD HL, STRIPS
+			call txy32.txy
+			ld bc,#BF00
+			ld de,#BFFF
+			call draw_jugo.DRAW				
+/*			ld de,#0E00
+	        ld hl,EsxLogo
+			call sprite2.OK*/
+			ld	bc,#9052
+			ld	(txy51.cursor),bc
+			ld	hl,BSD2
+			call txy51.txy
+holdkey4	call iinkey.IINKEY
+			jr nz,holdkey4
+
+4			xor a
+			ld bc,ZXi_port0					//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,255					//HW - FF - Firmware
+			out (c),a
+			xor a
+			out (#27),a
+			out (#67),a
+			ld a,6						//
+			out (#07),a
+			inc a
+			out (#47),a
+			ld hl,0			; run EasyHDD
+			ld de,32768
+			ld bc,16384
+			ldir
+
+			xor a
+			ld bc,ZXi_port0			//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,255				//HW - FF - Firmware
+			out (c),a
+			xor a	
+			out (#53),a
+			out (#27),a
+			out (#67),a
+			out (#07),a
+			inc a
+			out (#47),a
+
+			xor a
+			ld bc,ZXi_port0			//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,1					//HW - 1 - MB02+
+			out (c),a					
+			call 32768
+//autosys/autoexe
+			ld a,#61	;novy kod, opsano ze Shrekova Flashobootu
+			out (#17),a
+			ld a,#1E
+			rst #20		;sluzba .KILL
+			ld e,default_disk
+			ld a,bsd_setdrv
+			rst #20
+			jr nc,autosys_legacy_disk
+			ld e,0
+			ld a,bsd_setdir
+			rst #20
+			jr nc,autosys_legacy_disk
+			ld a,bsd_start
+			rst #20		;sluzba #30, start systemu. Pokud je autosys nalezen, dale se v kodu nepokracuje
+
+autosys_legacy_disk
+			ld e,legacy_default_disk
+			ld a,bsd_setdrv
+			rst #20
+			jr nc,bsdos_reset_ula
+			ld e,0
+			ld a,bsd_setdir
+			rst #20
+			jr nc,bsdos_reset_ula
+			ld a,bsd_start
+			rst #20
+			jp bsdos_reset_ula
+
+5			cp 'e'					// key e
+			jp z,bsdos_reset_ula
+			cp 'f'					// key f: same reset, ULAplus off
+			jp nz,7F				// no key
+			xor a
+			jr bsdos_reset_common
+
+bsdos_reset_ula
+			ld a,1
+
+bsdos_reset_common
+			ld (ula_requested),a
+
+			; Keep the proven firmware mapping used by the working SD init.
+			; The new EasySD routine has bounded retries and keeps interrupts off.
+			xor a
+			ld bc,ZXi_port0
+			out (c),a
+			ld bc,ZXi_port1
+			dec a					; HW #FF - Firmware
+			out (c),a
+			call SD_INIT_BOTH                       ; initialize SD1 and SD2 for E and F
+
+			xor a
+			ld bc,ZXi_port0			//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,255				//HW - FF - Firmware
+			out (c),a
+			xor a	
+			out (#53),a
+			out (#27),a
+			out (#67),a
+			out (#07),a
+			inc a
+			out (#47),a
+
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,1					//HW - 1 - MB02+
+			out (c),a			
+			ld a,64					// 128K reset in BSROM140
+			out (23),a
+
+			ld bc,g_ZXi_port0		; activate SAFE NMI
+			ld a,#80
+			out (c),a
+			inc b
+			ld a,1
+			out (c),a
+
+			call ula_disable
+			ld a,(ula_requested)
+			or a
+			jp z,ula_fallback
+
+			call bsd_dos
+			ld a,bsd_getcst
+			rst #20
+			jp nc,ula_fallback
+			push hl					; save current file number
+			push de					; save current directory and disk
+			xor a
+			ld (ula_workspace_ok),a
+
+			ld e,default_disk
+			call ula_try_disk
+			jr c,ula_workspace_loaded
+			ld e,legacy_default_disk
+			call ula_try_disk
+			jr nc,ula_restore_context
+
+ula_workspace_loaded
+			ld e,0
+			ld a,bsd_setdir
+			rst #20
+			jr nc,ula_restore_context
+
+			call ula_enable
+			call ula_workspace_start
+			call bsd_dos
+			ld a,1
+			ld (ula_workspace_ok),a
+
+ula_restore_context
+			pop de
+			push de
+			ld a,bsd_setdrv
+			rst #20
+			pop de
+			ld e,d
+			ld a,bsd_setdir
+			rst #20
+			pop bc
+			ld a,bsd_setlcx
+			rst #20
+
+			ld a,(ula_workspace_ok)
+			or a
+			jp z,ula_fallback
+			call bsd_rom
+			jp #3906
+
+ula_try_disk
+			ld a,bsd_setdrv
+			rst #20
+			jr nc,ula_try_failed
+			ld e,ula_workspace_dir
+			ld a,bsd_setdir
+			rst #20
+			jr nc,ula_try_failed
+			ld hl,ulaplusname
+			ld e,255
+			ld a,bsd_seasx
+			rst #20
+			jr nz,ula_try_failed
+			ld a,bsd_getcst
+			rst #20
+			jr nc,ula_try_failed
+			ld ix,ula_workspace_start
+			ld bc,0
+			ld e,1
+			ld a,bsd_loa1x
+			rst #20
+			jr nc,ula_try_failed
+			scf
+			ret
+
+ula_try_failed
+			or a					; clear carry
+			ret
+
+ula_disable
+			ld bc,#BF3B
+			ld a,#40
+			out (c),a
+			ld b,#FF
+			xor a
+			out (c),a
+			ret
+
+ula_enable
+			ld bc,#BF3B
+			ld a,#40
+			out (c),a
+			ld b,#FF
+			ld a,1
+			out (c),a
+			ret
+
+ula_fallback
+			call ula_disable
+			call #3C9C
+			ld a,#38
+			ld (#1266),a
+			ld (#128E),a
+			ld a,#20
+			ld (#22A2),a
+			ld a,#8D
+			ld (#03C8),a
+			ld (#0541),a
+			ld a,#32
+			ld (#126D),a
+			call bsd_rom
+			jp #3906
+
+ulaplusname
+			db "ula+_wksp "
+
+ula_requested		db 0
+ula_workspace_ok	db 0
+			
+7			cp 'd'
+			jp nz, 8F				
+; clear below 3/3			
+			ld   a,7
+			ld   HL,22528+512
+			ld   DE,22529+512
+			ld   BC,255
+			ld   (HL),a
+			ldir
+			ld   HL,20480
+			ld   DE,20481
+			ld   BC,2047
+			ld   (HL),l
+			ldir
+
+			xor a
+			ld bc,ZXi_port0					//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,#FF					//HW - FF - Firmware
+			out (c),a
+
+			xor a
+			ld bc,g_ZXi_port0
+			out (c),a
+			inc b
+			out (c),a  //select 0 - external device - MB03+
+			
+			out (#27),a
+			out (#67),a
+			ld a,20														
+			out (#07),a
+			inc a
+			out (#47),a
+			ld a,#60					//flash enable, read only
+			out (#53),a
+			ld hl,0
+			ld de,27000
+			ld bc,6000
+			ldir
+			xor a						//firmware flash page														
+			out (#07),a
+			inc a
+			out (#47),a
+
+			jp 27000
+			
+8			cp 't'					// key t - zx diagnostics
+			jr nz, 1F				// no key
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,255				//HW - FF - Firmware
+			out (c),a
+
+			xor a
+			ld bc,g_ZXi_port0
+			out (c),a
+			inc b
+			out (c),a  //select 0 - external device - MB03+
+			
+			out (#27),a
+			out (#67),a
+			ld a,2
+			out (#07),a
+			inc a
+			out (#47),a
+			ld a,%01100000	;enable flash write disable
+			out (#53),a
+			rst 0
+
+1			cp 6					// key shitf+2(capslock) - ESXDOS DivMMC warm start
+			jr nz, 9F
+			
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			inc b
+			ld a,#FF					//HW - FF - Firmware
+			out (c),a
+			xor a	
+			out (#53),a
+			out (#27),a
+			out (#67),a
+			out (#07),a
+			inc a
+			out (#47),a
+
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,2					//HW - 2 - DIVMMC
+			out (c),a
+			ld bc,ZXi_port0				//ZXi portselect 
+			ld a,2
+			out (c),a
+			ld bc,ZXi_port1
+			xor a					//IDE - 0 dissable
+			out (c),a			
+			out (#E3),a			//to force cold start zero $2dXX in page 0
+			jp #66
+
+9			cp '2'					// key 2 - Papaya DOS- ESXDOS DivMMC
+			jp nz, 10F
+
+esxboot		call clean
+fastsd		ld bc,#B800
+			ld	(txy32.cursor),bc
+			LD HL, STRIPS
+			call txy32.txy
+			ld bc,#BF00
+			ld de,#BFFF
+			call draw_jugo.DRAW				
+			ld de,#0E00
+	        ld hl,EsxLogo
+			call sprite2.OK
+			ld	bc,#9458
+			ld	(txy51.cursor),bc
+			ld	hl,ESX1
+			call txy51.txy					
+
+holdkey1	call iinkey.IINKEY
+			jr nz,holdkey1	
+
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,255					//HW - FF - Firmware
+			out (c),a
+			xor a	
+			out (#53),a
+			out (#27),a
+			out (#67),a
+			out (#07),a
+			inc a
+			out (#47),a
+			
+
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,2					//HW - 2 - DIVMMC
+			out (c),a
+			ld bc,ZXi_port0				//ZXi portselect 
+			ld a,2
+			out (c),a
+			ld bc,ZXi_port1
+			xor a					//IDE - 0 dissable
+			out (c),a
+			ld a,128
+div_erase	out (#E3),a
+			ld hl,8192
+			ld de,8193
+			ld bc,8191
+			ld (hl),l
+			ldir
+			inc a
+			cp 128+5
+			jr nz,div_erase		//delete first 32KB od DivMMC RAM
+			xor a				//is enought to erase bank0 or
+			out (#E3),a			//to force cold start zero $2dXX in page 0
+			rst 0
+10		cp "R"					//restart firmware
+			jr nz, 11F
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,255				//HW - FF - Firmware
+			out (c),a
+			xor a
+			out (#27),a
+			out (#67),a
+;			ld a,2
+			out (#07),a
+			inc a
+			out (#47),a
+			ld a,%01100000	;enable flash write disable
+			out (#53),a
+			rst 0
+11		cp "r"					//restart to ramcode
+			jr nz,12F
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			inc b
+			dec a				//HW - FF - Firmware
+			out (c),a
+			jp ramcode
+12		cp "T"					//advance system info
+			jp nz,14F
+13			call clean
+//carymary2
+			ld bc,#B800
+			ld	(txy32.cursor),bc
+			LD HL, STRIPS
+			call txy32.txy
+			ld bc,#BF00
+			ld de,#BFFF
+			call draw_jugo.DRAW			
+			ld de,#1013
+	        ld hl,CaroLogo
+			call sprite2.OK
+
+			xor a
+			ld bc,g_ZXi_port0
+			out (c),a
+			inc b
+			out (c),a  //select 0 - external device - MB03+
+
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld a,#FF
+			ld bc,ZXi_port1			
+			out (c),a
+			ld a,#E0				//FRAM active
+			out (#53),a
+
+			ld	bc,#8000
+			ld	(txy51.cursor),bc
+			ld	hl,ADVS0
+			call txy51.txy			
+			ld hl,#3FFF
+			ld e,(hl)
+			dec hl
+			ld a,(hl)
+			or e
+			ld hl,LEVEL7
+			jr nz, userlevel
+			ld a,(#3FFD)
+			sla a
+			ld hl,LEVEL6
+			jr c, userlevel
+			sla a
+			ld hl,LEVEL5
+			jr c, userlevel
+			sla a
+			ld hl,LEVEL4
+			jr c, userlevel
+			sla a
+			ld hl,LEVEL3
+			jr c, userlevel
+			sla a
+			ld hl,LEVEL2
+			jr c, userlevel
+			sla a
+			ld hl,LEVEL1
+			jr c, userlevel
+			ld hl,LEVEL0
+userlevel	call txy51.txy				
+			
+			ld	bc,#9000
+			ld	(txy51.cursor),bc
+			ld	hl,ADVS1
+			call txy51.txy
+
+			ld hl,#3FFC
+			ld de,xdec_06.zzbin
+			ld bc,4
+			ldir
+			call xdec_06.bindec
+			ld b,10
+			ld c," "
+			ld hl,xdec_06.zzdec
+1			ld a,(hl)
+			add a,"0"
+			cp "0"
+			jr nz,3F
+			ld a,c			
+			jr 2F
+3			ld c,"0"			
+2			push hl
+			push bc
+			call txy51.xy
+			pop bc
+			pop hl
+			inc hl
+			djnz 1B
+
+			ld	bc,#9800
+			ld	(txy51.cursor),bc
+			ld	hl,ADVS2
+			call txy51.txy
+
+			ld hl,#3FF8
+			ld de,xdec_06.zzbin
+			ld bc,4
+			ldir
+			call xdec_06.bindec
+			ld b,10
+			ld c," "
+			ld hl,xdec_06.zzdec
+1			ld a,(hl)
+			add a,"0"
+			cp "0"
+			jr nz,3F
+			ld a,c			
+			jr 2F
+3			ld c,"0"			
+2			push hl
+			push bc
+			call txy51.xy
+			pop bc
+			pop hl
+			inc hl
+			djnz 1B
+
+			ld	bc,#A000
+			ld	(txy51.cursor),bc
+			ld	hl,ADVS3
+			call txy51.txy
+
+			ld hl,#3FF4
+			ld de,xdec_06.zzbin
+			ld bc,4
+			ldir
+			call xdec_06.bindec
+			ld b,10
+			ld c," "
+			ld hl,xdec_06.zzdec
+1			ld a,(hl)
+			add a,"0"
+			cp "0"
+			jr nz,3F
+			ld a,c			
+			jr 2F
+3			ld c,"0"			
+2			push hl
+			push bc
+			call txy51.xy
+			pop bc
+			pop hl
+			inc hl
+			djnz 1B
+
+			ld	bc,#A800
+			ld	(txy51.cursor),bc
+			ld	hl,ADVS4
+			call txy51.txy
+
+			ld hl,#3FF0
+			ld de,xdec_06.zzbin
+			ld bc,4
+			ldir
+			call xdec_06.bindec
+			ld b,10
+			ld c," "
+			ld hl,xdec_06.zzdec
+1			ld a,(hl)
+			add a,"0"
+			cp "0"
+			jr nz,3F
+			ld a,c			
+			jr 2F
+3			ld c,"0"			
+2			push hl
+			push bc
+			call txy51.xy
+			pop bc
+			pop hl
+			inc hl
+			djnz 1B
+
+			ld	bc,#B000
+			ld	(txy51.cursor),bc
+			ld	hl,ADVS5
+			call txy51.txy
+
+			ld hl,#3FEC
+			ld de,xdec_06.zzbin
+			ld bc,4
+			ldir
+			call xdec_06.bindec
+			ld b,10
+			ld c," "
+			ld hl,xdec_06.zzdec
+1			ld a,(hl)
+			add a,"0"
+			cp "0"
+			jr nz,3F
+			ld a,c			
+			jr 2F
+3			ld c,"0"			
+2			push hl
+			push bc
+			call txy51.xy
+			pop bc
+			pop hl
+			inc hl
+			djnz 1B
+			;Core Time Stamp FULL
+			ld	bc,#5000
+			ld	(txy51.cursor),bc
+			ld	hl,COREFW1
+			call txy51.txy
+			ld	bc,#5017
+			ld	(txy51.cursor),bc
+			ld	hl,COREFW2
+			call txy51.txy
+			ld	bc,#5021
+			ld	(txy51.cursor),bc
+			ld bc,ZXi_port0
+			ld a,#FF
+			out (c),a
+			ld b,high ZXi_port7
+1			dec b
+			ld h,0
+			in l,(c)
+			push bc
+			call NUMBER1
+			pop bc
+			ld a,b
+			cp high ZXi_port1
+			jr nz, 1B
+
+			call iinkey.ANYKEY
+			jp 13B
+
+14			cp "@"					//DivIDE
+			jp nz, loopkey
+			
+			call clean
+			ld bc,#B800
+			ld	(txy32.cursor),bc
+			LD HL, STRIPS
+			call txy32.txy
+			ld bc,#BF00
+			ld de,#BFFF
+			call draw_jugo.DRAW				
+			ld de,#0E00
+	        ld hl,EsxLogo
+			call sprite2.OK
+			ld	bc,#9458
+			ld	(txy51.cursor),bc
+			ld	hl,ESX1
+			call txy51.txy					
+
+holdkey2	call iinkey.IINKEY
+			jr nz,holdkey2	
+
+			xor a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,255					//HW - FF - Firmware
+			out (c),a
+			xor a	
+			out (#53),a
+			out (#27),a
+			out (#67),a
+			out (#07),a
+			inc a
+			out (#47),a
+			
+			xor a
+//			out (23),a
+			ld bc,ZXi_port0				//ZXi portselect
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,3					//HW - 3 - DIVMMC/DIVIDE
+			out (c),a
+
+			ld bc,ZXi_port0				//ZXi portselect 
+			ld a,2
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,2					//IDE - 2 PVL ports- DIVMMC/DIVIDE
+			out (c),a
+
+			ld bc,ZXi_port0				//ZXi portselect 
+			ld a,1					//Audio
+			out (c),a
+			ld bc,ZXi_port1
+			ld a,%11101111  		//dissable GS
+			out (c),a
+
+			ld a,128
+div_erase2	out (#E3),a
+			ld hl,8192
+			ld de,8193
+			ld bc,8191
+			ld (hl),l
+			ldir
+			inc a
+			cp 128+5
+			jr nz,div_erase2			//delete first 32KB od DivIde RAM
+			xor a						//is enought to erase bank0 or
+			out (#E3),a					//to force cold start zero $2dXX in page 0
+			rst 0
+
+;------------------------------
+;HL-HODNOTA
+;TISKNE CISLO TYPU INTEGER
+NUMBER4  ld   de,-10000
+         call NUM_JED
+NUMBER3  ld   de,-1000
+         call NUM_JED
+NUMBER2  ld   de,-100
+         call NUM_JED
+NUMBER1  ld   de,-10
+         call NUM_JED
+NUMBER0  ld   a,l
+         add  a,48
+         jp   txy51.xy
+
+NUM_JED  xor  a
+NUM_JED1 add  hl,de
+         jr   nc,NUM_PRIC
+         inc  a
+         jr   NUM_JED1
+NUM_PRIC sbc  hl,de
+         add  a,48
+         push bc
+         push hl
+         call txy51.xy
+         pop  hl
+         pop  bc
+         ;;inc  c
+         ret
+
+clock
+			ld ix,clockbuff
+/*			ld a,(SLIM)
+			and a
+			jp nz,1F
+	INCLUDE "rtcds3234.a80"		; RTC module DS3234
+			jp 3F
+1	*/		
+	INCLUDE "rtc72421.a80"		; RTC module 72421
+
+3
+			ld a,6			//clear place
+			ld hl, 16384+2048+32+512+27
+			ld de, 16384+2048+32+512+27+1
+			ld bc,4
+clock_clear_row	ld (hl),0
+			push bc
+			ldir
+			pop bc
+			sbc hl,bc
+			inc h
+			ld d,h
+			ld e,l
+			inc e
+			dec a
+			jr nz,clock_clear_row
+
+//			ld a,2
+//			out (254),a
+
+			ld	bc,#49D8	//print clock
+			ld	(txy51.cursor),bc	
+			ld hl,clockbuff3
+			call txy51.txy
+//			ld a,3
+//			out (254),a
+			ld	bc,#4990
+			ld	(txy51.cursor),bc			
+			ld hl,clockbuff
+			call txy51.txy
+//			ld a,4
+//			out (254),a
+			ld	bc,#49C5
+			ld	(txy51.cursor),bc			
+			ld hl,clockbuff2
+			call txy51.txy
+			
+			ret
+clockbuff	dc "22/05/2073" 
+clockbuff2	dc "Tue "
+clockbuff3	dc "12:01:28"
+weekdays	dc "Sun "
+			dc "Mon "
+			dc "Tue "
+			dc "Wed "
+			dc "Thu "
+			dc "Fri "
+			dc "Sat "
+
+clean		ld a,7			//clear place
+			ld hl, 16384+2048+32+256+0
+			ld de, 16384+2048+32+256+0+1
+			ld bc,255-32
+clean_attr_row	ld (hl),0
+			push bc
+			ldir
+			pop bc
+			sbc hl,bc
+			inc h
+			ld d,h
+			ld e,l
+			inc e
+			dec a
+			jr nz,clean_attr_row
+			ld hl, 16384+2048+64+0
+			ld de, 16384+2048+64+0+1
+			ld bc,255-64
+			ld (hl),0
+			ldir
+			ld hl, 16384+4096
+			ld de, 16384+4096+1
+			ld bc,2047
+			ld (hl),l
+			ldir					
+			ret	
+; --------------- L I B R A R I E S ---------------------------------------	
+	
+//INCLUDE "nasobeniHLDE.a80"
+	INCLUDE "draw-jugo.a80"
+	INCLUDE "cls.a80"
+	INCLUDE "iinkey.a80"
+	INCLUDE "wait.a80"
+//	INCLUDE "t42.a80"
+//	INCLUDE "txy.a80"
+	INCLUDE "txy51.a80"
+	INCLUDE "txy32.a80"
+	INCLUDE "sprite2.a80"
+	INCLUDE "xdec_06.a80"
+	INCLUDE "cf.a80"
+	INCLUDE "effect.a80"			; Busy nonbootdisk effect
+	INCLUDE "i-time.a80"
+
+MB03pluslogo
+	INCBIN "MB03+LOGOv2.bin"
+ultimatelogo	
+	INCBIN "ULTIMATE.bin"
+dots	
+//	INCBIN "DOTS.bin"	
+CaroLogo
+	INCBIN "CaroLogo.bin"
+EsxLogo
+	INCBIN "ESXLOGO.bin"
+BSDOSLogo
+	INCBIN "BSDOSLOGO.bin"		
+/*
+NewdimLogo
+	INCBIN "NewdimLogo.bin"
+eightbc_i
+	INCBIN "8BC_I.cde"
+EasyLogoSmall
+	INCBIN "EasyLogoSmall.bin"
+*/	
+/*easyhdd	
+	INCBIN "easyhdd.out"
+easyhddend*/
+/*
+zvuk
+	INCBIN "ZVUK.BIN"
+zvukend
+*/
+
+/*@SP_TAB
+@TAB_sprite1
+		 DEFB 10,4
+         DEFW CaroLogo
+         DEFB 24,20
+         DEFW NewdimLogo
+         defb 0,21
+         defw eightbc_i
+         defb 1,2
+         defw eightbc_i
+         defb 25,2
+         defw EasyLogoSmall
+*/		 
+; --------------- T E X T---------------------------------------
+TEXT0 	 	dc 16,7,"LMN128-Jan Kucera-Zlin/CZ"
+TEXT4 		db 16,71,"1:",16,6,"BSDOS308+EasyHDD  ",16,71,"e:",16,6,"bs128Kreset ",16,71,"    ABCD:",16,7,"UserApps"
+			dc " "
+TEXT4S 		db 16,71,"1:",16,6,"divSD - esxDOS boot ",16,71,"  ",16,6,"          ",16,71,"    ABCD:",16,7,"UserApps"
+			dc " "			
+TEXT2	 	db 16,71,"2:",16,6,"DivSD   ",16,71,"@:",16,6,"DivIDE  "
+			dc " "
+//TEXT3    	db 16,71,"3:",16,6,"Ultimate BSDOS & esxDOS ",16,71,"d:",16,7,"Dev+ ",16,71,"t:",16,7,"Diag ",16,71,"break:",16,7,"ZXROM  "
+TEXT3    	db 16,71,"CapsLock:",16,6,"esxNMI   ",16,71,"d:",16,7,"Dev+ ",16,71,"t:",16,7,"Diag ",16,71,"break:",16,7,"ZXROM(no DOS)"
+
+			dc " "
+//TEXT1    	dc 16,69,"MB03+ Ultimate firmware 1.28"
+TEXT5       db 16,71,"W:",16,7,"Wifi ",16,71,"T:",16,7,"SysInfo ",16,71,"S:",16,7,"SetU"
+			dc "p"	
+STRIPS		db 16,66,32,32
+			db 16,70,32,32
+			db 16,68,32,32,32,32,32
+			db 16,69,32,32,32,32,32
+			db 16,7,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32+128
+;TEXTTEST 	dc 16,6,"0123456789 128 WADHTUTTUU ZX Spectrum 128+2"
+;TEXTTEST2 dc 16,6,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwyxz"
+HW1			dc 16,67,"HARDWARE: "
+			//dc 16,7,"3.1"
+HW2			db 16,7,"SRAM 16MB ",16,3,"| ",16,7,"FastSRAM 2MB ",16,3,"| ",16,7,"FLASH 1MB ",16,3,"| ",16,7,"FRAM 8KB"	
+			dc 16,7," "		
+HW3			db 16,7,"divSD ",16,3,"| ",16,7,"divIDE ",16,3,"| ",16,7,"MB-CF ",16,3,"| ",16,7," uSD ",16,3,"| ",16,7,"CompactFlash ",16,3,"| ",16,7,"NMI"	
+			dc 16,7," "	
+HW4			db 16,7,"Wi-Fi ",16,3,"| ",16,7,"UART ",16,3,"| ",16,7,"RTC ",16,3,"| ",16,7,"USB/PS2 ",16,3,"| ",16,7,"K-mouse ",16,3,"| ",16,7,"PC keyb."
+			dc 16,7," "	
+HW5			db 16,7,"LED matrix ",16,3,"| ",16,7,"joystick ",16,3,"| ",16,7,"stereo audio ",16,3,"| ",16,7,"dig. video"
+			dc 16,7," "	
+
+//HW1S		dc 16,67,"HARDWARE: "
+			//dc 16,7,"3.1"
+HW2S		db 16,7,"RAM 4MB ",16,3,"| ",16,7,"GenSound RAM 2MB ",16,3,"| ",16,7,"FLASH 1MB ",16,3,"| ",16,7,"FRAM 8KB"	
+			dc 16,7," "		
+HW3S		db 16,7,"divSD ",16,3,"| ",16,7,"uSD  ",16,3,"| ",16,7,"USB Keyboard  ",16,3,"| ",16,7,"USB Mouse ",16,3,"| ",16,7,"NMI"	
+			dc 16,7," "	
+HW4S		db 16,7,"Wi-Fi ",16,3,"| ",16,7,"UART ",16,3,"| ",16,7,"batteryless RTC ",16,3,"| ",16,7,"A-mouse ",16,3,"| ",16,7,"K-mouse "
+			dc 16,7," "	
+HW5S		db 16,7,"Standard/Sega joystick ",16,3,"| ",16,7,"stereo audio ",16,3,"| ",16,7,"dig. video"
+			dc 16,7," "				
+
+CONF1		dc 16,67,"FEATURES: "
+CONF2		db 16,7,"3xAY ",16,3,"| ",16,7,"TurboSound/FM ",16,3,"| ",16,7,"SAA1099 ",16,3,"| ",16,7,"SounDrive ",16,3,"| ",16,7,"SID"
+			dc 16,7," "
+CONF3		
+			db 16,7,"GeneralSound ",16,3,"| ",16,7,"DMA ",16,3,"| ",16,7,"FDMA ",16,3,"| ",16,7,"Z-Control ",16,3,"| ",16,7,"KeyLayer"
+			dc 16,7," "
+CONF4		
+			db 16,7,"HGFX ",16,3,"| ",16,7,"HRC/HRXC ",16,3,"| ",16,7,"ULA+ ",16,3,"| ",16,7,"TrueCol ",16,3,"| ",16,7,"HW GigaScreen"
+			dc 16,7," "			
+		
+ADVS0		db 16,6,"User level: " 
+			dc 16,7," "			
+ADVS1		db 16,6,"OnTime: " 
+			dc 16,7," "
+ADVS2		db 16,6,"Nmi:    "
+			dc 16,7," "
+ADVS3		db 16,6,"Reset:  "
+			dc 16,7," "
+ADVS4		db 16,6,"Extra:  "
+			dc 16,7," "
+ADVS5		db 16,6,"PowerUp:"
+			dc 16,7," "
+LEVEL0		dc 16,7,"Loser"
+LEVEL1		dc 16,7,"Rookie"
+LEVEL2		dc 16,6,"Novice"
+LEVEL3		dc 16,6,"Beginner"
+LEVEL4		dc 16,5,"Enhanced"
+LEVEL5		dc 16,5,"Geek"
+LEVEL6		dc 16,5,"Guru"
+LEVEL7		dc 16,4,"Ultimate"						
+FW1			dc 16,7,"Boot:"
+COREFW1		dc "Core:"
+COREFW2		dc "20"
+ESX1		dc 16,5,"esxDOS is loading"
+BSD1		dc 16,5,"BSDOS+EasyHDD is loading "
+BSD2		dc 16,5,"EasyHDD is loading "
+/*ULT1		db 16,5,"A brand new ",16,7,"BSDOS ",16,5,"is in progress of development.",32+128
+ULT2		db 16,6,"BUSY ",16,5,"- famous demos coder and author of BSDOS",32+128
+ULT3		dc 16,5,"for MB02+ will bring a new version soon."
+ULT4		db 16,6,"Miguel ",16,5,"(Papaya Dezign) is going to develop a new",32+128
+ULT5		db 16,7,"ESXDOS ",16,5,"ver. 0.9.x for MB03+ Ultimate with",32+128
+ULT6		db 16,5,"lots of new features, incl. Long filename (LFN).",32+128
+ULT7		dc 16,4,"Thanks to MB03+ capabilities both systems will be "
+ULT8		dc 16,4,"more flexible and faster."*/
+
+TX1 		dc 16,7,"*"
+TX2 		dc 16,7,"!"
+
+white		dc 16,7," "
+blue		dc 16,1," "
+
+SLIMTXT		dc 16,64+7,"Slim"
+
+SLIM		db 1 // detection of Slim
+
+//test#3FFD   db 32
+
+	INCLUDE "sd_init.a80"
+
+DATE		db 16,0
+	LUA ALLPASS
+	_pc('db	"' .. os.date("%Y%m%d") .. '"') 
+	ENDLUA
+	dc " " 
+		//block 8 // kompenzace delky souboru kvuli os.date
+endramcode			
+	ASSERT endramcode <= #10000
+	
+	savesna  "boot.sna",ramcode
+	EMPTYTAP "boot.tap"
+	SAVETAP  "boot.tap",CODE,"boot",maincode,endramcode-maincode,maincode
+	ENDMODULE
+
