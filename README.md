@@ -2,6 +2,12 @@
 
 This repository is a fork of the original MB03+ BOOT project.
 
+## Download
+
+[**Download current boot.tap**](https://github.com/milan-stava/mb03plusboot/raw/sd2-init/boot.tap)
+
+This TAP contains the current unofficial MB03+ BOOT build with dual SD initialization and preservation of SRAM page 98 for EasyCF 1.1.
+
 
 
 # DIFFERENCIES IN THIS FORK AS OPPOSED TO OFFICIAL BRANCH
